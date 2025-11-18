@@ -1,0 +1,25 @@
+services:
+  db:
+    image: postgres:latest
+    ports:
+      - "${DB_PORT}:5432" 
+      
+    # Define as variáveis de ambiente para o container do PostgreSQL
+    environment:
+      # Nome do banco de dados (PGDATABASE)
+      POSTGRES_DB: ${DB_NAME}
+      # Usuário do banco de dados (PGUSER)
+      POSTGRES_USER: ${DB_USER}
+      # Senha do banco de dados (PGPASSWORD)
+      POSTGRES_PASSWORD: ${DB_PASS}
+      
+    # Define a regra de reinício (sempre tenta reiniciar o container se ele falhar)
+    restart: always
+    
+    # Armazena os dados do banco de dados em um volume persistente
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+# Define os volumes que serão criados e gerenciados pelo Docker
+volumes:
+  postgres_data:
