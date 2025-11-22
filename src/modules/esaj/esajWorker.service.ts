@@ -88,7 +88,7 @@ export class EsajWorkerService implements OnModuleInit {
           batch.map((process) =>
             limit(async () => {
               try {
-                const data = await this.esajService.esajScrapeLawSuit(
+                const data = await this.esajService.scrapeLawSuit(
                   process.processo,
                   false,
                 );

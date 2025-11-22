@@ -9,5 +9,5 @@ export const databaseConfig: DataSourceOptions = {
   database: process.env.DB_NAME || 'juris_db',
   entities: [__dirname + '/../Entities/*.entity.{ts,js}'],
   synchronize: true,
-  logging: true,
+  logging: false,
 };

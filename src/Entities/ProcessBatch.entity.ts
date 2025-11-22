@@ -26,6 +26,9 @@ export class ProcessBatchEntity {
   @Column({ type: 'timestamp', comment: 'Data dos processos' })
   processDate: Date;
 
+  @Column({ type: 'text', comment: 'Descrição do lote de processos' })
+  description: string;
+
   @Column({
     type: 'boolean',
     default: false,

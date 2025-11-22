@@ -12,7 +12,12 @@ import {
 } from '@nestjs/common';
 import { EsajService } from './esaj.service';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 @Controller('esaj')
 export class EsajController {
@@ -39,7 +44,7 @@ export class EsajController {
     const asNumberBool = asNumber === 'true';
 
     try {
-      const result = await this.esajService.esajScrapeLawSuit(
+      const result = await this.esajService.scrapeLawSuit(
         lawSuitNumber,
         asNumberBool,
       );
@@ -53,6 +58,25 @@ export class EsajController {
     }
   }
 
+  @ApiOperation({ summary: 'retorna URL de acesso ao processo no ESAJ' })
+  @ApiResponse({
+    status: 200,
+    description: 'URL do processo retornada com sucesso.',
+  })
+  @Get('lawsuit-url/:number')
+  getLawSuitUrl(@Param('number') number: string) {
+    if (number === undefined || number.trim() === '') {
+      throw new BadRequestException('Número do processo é obrigatório');
+    }
+    const lawSuitNumber = number.replace(/\D/g, '');
+    const url = this.esajService.getUrl(lawSuitNumber);
+
+    return {
+      lawsuit: lawSuitNumber,
+      url: url.toString(),
+    };
+  }
+
   @ApiOperation({
     summary:
       'Importar PDF de lista processo do ESAJ para processamento de reqdo e valor',
@@ -60,6 +84,25 @@ export class EsajController {
   @ApiResponse({
     status: 200,
     description: 'PDF processado e dados serão buscados de forma assíncrona.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Arquivo PDF de processos',
+    required: true,
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+        state: {
+          type: 'string',
+          example: 'SP',
+        },
+      },
+      required: ['file'],
+    },
   })
   @Post('import-pdf')
   @UseInterceptors(FileInterceptor('file'))

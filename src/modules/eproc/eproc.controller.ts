@@ -10,7 +10,12 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { EprocService } from './eproc.service';
-import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('eproc')
@@ -35,7 +40,7 @@ export class EprocController {
     const asNumberBool = asNumber === 'true';
 
     try {
-      const result = await this.eprocService.eprocScrapeLawSuit(
+      const result = await this.eprocService.scrapeLawSuit(
         lawSuitNumber,
         asNumberBool,
       );
@@ -60,7 +65,7 @@ export class EprocController {
       throw new BadRequestException('Número do processo é obrigatório');
     }
     const lawSuitNumber = number.replace(/\D/g, '');
-    const url = this.eprocService.getEprocUrl(lawSuitNumber);
+    const url = this.eprocService.getUrl(lawSuitNumber);
 
     return {
       lawsuit: lawSuitNumber,
@@ -89,6 +94,25 @@ export class EprocController {
   @ApiResponse({
     status: 200,
     description: 'PDF processado e dados serão buscados de forma assíncrona.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Arquivo PDF de processos',
+    required: true,
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+        },
+        state: {
+          type: 'string',
+          example: 'SP',
+        },
+      },
+      required: ['file'],
+    },
   })
   @Post('import-pdf')
   @UseInterceptors(FileInterceptor('file'))
