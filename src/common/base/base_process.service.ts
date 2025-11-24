@@ -108,7 +108,7 @@ export abstract class BaseProcessService implements OnModuleInit {
 
     // Criar o lote (cabeçalho)
     const batch = await this.batchRepository.save({
-      system: headerInfo.system,
+      system: headerInfo.system === 'SAJ' ? 'ESAJ' : system,
       state: state,
       processDate: headerInfo.processDate,
       description: headerInfo.description,

@@ -1,4 +1,3 @@
-import { UpdateServiceSessionRequest } from './../../DTO/Request/UpdateServiceSessionRequest';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import * as cheerio from 'cheerio';
 import { TextItem } from 'pdfjs-dist/types/src/display/api';
@@ -165,7 +164,7 @@ export class EprocService extends BaseProcessService {
     return processData;
   }
 
-  public async updateSessionId(request: UpdateServiceSessionRequest) {
+  public async updateSessionId(sessionId: string) {
     const expiresAt = new Date(Date.now() + 22 * 60 * 60 * 1000);
 
     let existing = await this.serviceSessionRepository.findOne({
@@ -174,25 +173,25 @@ export class EprocService extends BaseProcessService {
 
     if (existing) {
       this.serviceSessionRepository.merge(existing, {
-        session_id: request.session_id,
+        session_id: sessionId,
         expires_at: expiresAt,
       });
     } else {
       existing = this.serviceSessionRepository.create({
         service_name: 'eproc',
-        session_id: request.session_id,
+        session_id: sessionId,
         expires_at: expiresAt,
       });
     }
 
     // Atualiza cache em memória
-    this.PHPSESSID = request.session_id;
+    this.PHPSESSID = sessionId;
     this.sessionExpiresAt = expiresAt;
 
     await this.serviceSessionRepository.save(existing);
 
     return {
-      sessionId: request.session_id,
+      sessionId: sessionId,
       expiresAt,
     };
   }

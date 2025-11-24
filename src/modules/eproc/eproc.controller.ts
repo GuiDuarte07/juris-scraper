@@ -5,7 +5,6 @@ import {
   Get,
   Param,
   Post,
-  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -28,22 +27,15 @@ export class EprocController {
     description: 'Dados de requerido e valor da causa retornados.',
   })
   @Get('lawsuit/:number')
-  async getLawSuitData(
-    @Param('number') number: string,
-    @Query('asNumber') asNumber: string,
-  ) {
+  async getLawSuitData(@Param('number') number: string) {
     if (number === undefined || number.trim() === '') {
       throw new BadRequestException('Número do processo é obrigatório');
     }
 
     const lawSuitNumber = number.replace(/\D/g, '');
-    const asNumberBool = asNumber === 'true';
 
     try {
-      const result = await this.eprocService.scrapeLawSuit(
-        lawSuitNumber,
-        asNumberBool,
-      );
+      const result = await this.eprocService.scrapeLawSuit(lawSuitNumber);
 
       return {
         lawsuit: lawSuitNumber,
@@ -79,12 +71,12 @@ export class EprocController {
     description: 'PHPSESSID atualizado com sucesso.',
   })
   @Post('set-session')
-  setSession(@Body('phpsessid') phpsessid: string) {
-    if (phpsessid === undefined || phpsessid.trim() === '') {
+  setSession(@Body('sessionId') sessionId: string) {
+    if (sessionId === undefined || sessionId.trim() === '') {
       throw new BadRequestException('PHPSESSID é obrigatório');
     }
 
-    this.eprocService.updateSessionId(phpsessid.trim());
+    this.eprocService.updateSessionId(sessionId);
   }
 
   @ApiOperation({

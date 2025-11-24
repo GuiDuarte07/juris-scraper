@@ -37,8 +37,8 @@ export class ProcessEntity {
   })
   processo: string;
 
-  @Column({ type: 'varchar', nullable: true, comment: 'Valor da ação' })
-  valor: string;
+  @Column('numeric', { precision: 12, scale: 2, nullable: true })
+  valor?: number;
 
   @Column({
     type: 'varchar',
@@ -46,7 +46,7 @@ export class ProcessEntity {
     nullable: true,
     comment: 'Nome do requerido',
   })
-  requerido: string;
+  requerido?: string;
 
   @Column({
     type: 'boolean',

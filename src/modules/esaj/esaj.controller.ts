@@ -32,22 +32,15 @@ export class EsajController {
     description: 'Dados de requerido e valor da causa retornados.',
   })
   @Get('lawsuit/:number')
-  async getLawSuitData(
-    @Param('number') number: string,
-    @Query('asNumber') asNumber: string = 'false',
-  ) {
+  async getLawSuitData(@Param('number') number: string) {
     if (number === undefined || number.trim() === '') {
       throw new BadRequestException('Número do processo é obrigatório');
     }
 
     const lawSuitNumber = number.replace(/\D/g, '');
-    const asNumberBool = asNumber === 'true';
 
     try {
-      const result = await this.esajService.scrapeLawSuit(
-        lawSuitNumber,
-        asNumberBool,
-      );
+      const result = await this.esajService.scrapeLawSuit(lawSuitNumber);
 
       return {
         lawsuit: lawSuitNumber,

@@ -5,9 +5,17 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProcessEntity } from 'src/Entities/Process.entity';
 import { ProcessBatchEntity } from 'src/Entities/ProcessBatch.entity';
 import { ProcessService } from '../process/process.service';
+import { ServiceSessionEntity } from 'src/Entities/ServiceSession.entity';
+import { EsajWorkerService } from './esajWorker.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ProcessEntity, ProcessBatchEntity])],
+  imports: [
+    TypeOrmModule.forFeature([
+      ProcessEntity,
+      ProcessBatchEntity,
+      ServiceSessionEntity,
+    ]),
+  ],
   controllers: [EsajController],
   providers: [EsajService, ProcessService],
 })
