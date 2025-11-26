@@ -6,6 +6,7 @@ import { ProcessBatchEntity } from 'src/Entities/ProcessBatch.entity';
 import { BaseWorkerService } from 'src/common/base/base_worker.service';
 import { HtmlDataReturnType } from 'src/common/base/base_process.service';
 import { EprocService } from './eproc.service';
+import { BatchProcessStatusEntity } from 'src/Entities/BatchProcessStatus.entity';
 
 @Injectable()
 export class EprocWorkerService extends BaseWorkerService {
@@ -17,9 +18,11 @@ export class EprocWorkerService extends BaseWorkerService {
     protected readonly processRepository: Repository<ProcessEntity>,
     @InjectRepository(ProcessBatchEntity)
     protected readonly batchRepository: Repository<ProcessBatchEntity>,
+    @InjectRepository(BatchProcessStatusEntity)
+    protected readonly batchStatusRepository: Repository<BatchProcessStatusEntity>,
     private readonly eprocService: EprocService,
   ) {
-    super(processRepository, batchRepository);
+    super(processRepository, batchRepository, batchStatusRepository);
   }
 
   protected async processLawSuit(

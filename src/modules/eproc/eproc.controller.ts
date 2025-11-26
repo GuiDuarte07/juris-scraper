@@ -71,12 +71,12 @@ export class EprocController {
     description: 'PHPSESSID atualizado com sucesso.',
   })
   @Post('set-session')
-  setSession(@Body('sessionId') sessionId: string) {
+  async setSession(@Body('sessionId') sessionId: string) {
     if (sessionId === undefined || sessionId.trim() === '') {
       throw new BadRequestException('PHPSESSID é obrigatório');
     }
 
-    this.eprocService.updateSessionId(sessionId);
+    await this.eprocService.updateSessionId(sessionId);
   }
 
   @ApiOperation({
@@ -132,7 +132,7 @@ export class EprocController {
     // Chamar o serviço para importar o PDF
     const result = await this.eprocService.importPdfToDatabase(
       file.buffer,
-      'eproc',
+      'EPROC',
       state,
     );
 
@@ -141,5 +141,15 @@ export class EprocController {
         'PDF importado com sucesso! Os processos serão processados automaticamente.',
       ...result,
     };
+  }
+
+  @Get('batch/:batchId')
+  async getBatchStatus(@Param('batchId') batchId: number) {
+    return await this.eprocService.getBatchStatus(batchId);
+  }
+
+  @Get('batch')
+  async listProcessingBatches() {
+    return await this.eprocService.listProcessingBatches();
   }
 }

@@ -6,7 +6,6 @@ import {
   Get,
   Param,
   Post,
-  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -123,7 +122,7 @@ export class EsajController {
     // Chamar o serviço para importar o PDF
     const result = await this.esajService.importPdfToDatabase(
       file.buffer,
-      'eproc',
+      'ESAJ',
       state,
     );
 
@@ -132,5 +131,15 @@ export class EsajController {
         'PDF importado com sucesso! Os processos serão processados automaticamente.',
       ...result,
     };
+  }
+
+  @Get('batch/:batchId')
+  async getBatchStatus(@Param('batchId') batchId: number) {
+    return await this.esajService.getBatchStatus(batchId);
+  }
+
+  @Get('batch')
+  async listProcessingBatches() {
+    return await this.esajService.listProcessingBatches();
   }
 }

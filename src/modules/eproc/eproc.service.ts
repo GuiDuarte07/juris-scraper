@@ -11,6 +11,11 @@ import { ProcessBatchEntity } from 'src/Entities/ProcessBatch.entity';
 import { ProcessEntity } from 'src/Entities/Process.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ServiceSessionEntity } from 'src/Entities/ServiceSession.entity';
+import { InjectQueue } from '@nestjs/bull';
+import type { Queue } from 'bull';
+import { BatchProcessStatusEntity } from 'src/Entities/BatchProcessStatus.entity';
+import { HttpService } from '@nestjs/axios';
+import { setupEprocInterceptor } from 'src/interceptors/eproc.interceptor';
 
 @Injectable()
 export class EprocService extends BaseProcessService {
@@ -21,8 +26,20 @@ export class EprocService extends BaseProcessService {
     protected readonly processRepository: Repository<ProcessEntity>,
     @InjectRepository(ServiceSessionEntity)
     private readonly serviceSessionRepository: Repository<ServiceSessionEntity>,
+    @InjectRepository(BatchProcessStatusEntity)
+    protected readonly batchStatusRepository: Repository<BatchProcessStatusEntity>,
+    @InjectQueue('eproc-process-queue') private readonly eprocQueue: Queue,
   ) {
-    super(batchRepository, processRepository);
+    const httpService = new HttpService();
+
+    super(
+      httpService,
+      batchRepository,
+      processRepository,
+      batchStatusRepository,
+    );
+
+    setupEprocInterceptor(this)(httpService.axiosRef);
   }
 
   protected getExtraHeaders(): Record<string, string> | null {
@@ -80,7 +97,6 @@ export class EprocService extends BaseProcessService {
       value: numericValue || 0,
     };
   }
-
   getUrl = (lawSuitNumber: string) => {
     const url = new URL(
       'https://eproc1g-consulta.tjsp.jus.br/eproc/externo_controlador.php',
@@ -221,8 +237,30 @@ export class EprocService extends BaseProcessService {
     return this.PHPSESSID;
   }
 
+  public getBatchStatus(batchId: number) {
+    return this.batchStatusRepository
+      .createQueryBuilder('status')
+      .innerJoin('status.batch', 'batch')
+      .where('status.batchId = :batchId', { batchId })
+      .andWhere('batch.system = :system', { system: 'EPROC' })
+      .getOne();
+  }
+
+  public listProcessingBatches() {
+    return this.batchStatusRepository
+      .createQueryBuilder('status')
+      .innerJoin('status.batch', 'batch')
+      .where('status.status = :status', { status: 'processing' })
+      .andWhere('batch.system = :system', { system: 'EPROC' })
+      .getMany();
+  }
+
   private isSessionExpired(expires: Date): boolean {
     if (!expires) return true;
     return expires.getTime() <= Date.now();
+  }
+
+  protected async addToProcessQueue(batchId: number): Promise<void> {
+    await this.eprocQueue.add({ batchId });
   }
 }

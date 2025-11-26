@@ -1,49 +1,88 @@
 import { HtmlDataReturnType } from 'src/common/base/base_process.service';
 
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProcessEntity } from 'src/Entities/Process.entity';
 import { ProcessBatchEntity } from 'src/Entities/ProcessBatch.entity';
 import pLimit from 'p-limit';
+import { BatchProcessStatusEntity } from 'src/Entities/BatchProcessStatus.entity';
 
 @Injectable()
-export abstract class BaseWorkerService implements OnModuleInit {
+export abstract class BaseWorkerService {
   protected abstract readonly logger: Logger;
   protected abstract readonly system: string;
 
-  protected isProcessing = false;
   protected baseBatchDelay = 2000;
   protected currentBatchDelay = this.baseBatchDelay;
   protected consecutiveErrors = 0;
   protected readonly MAX_BATCH_DELAY = 15000;
   protected readonly CONCURRENT_REQUESTS = 3;
-  //abstract protected baseProcessService: BaseProcessService;
 
   constructor(
     @InjectRepository(ProcessEntity)
     protected readonly processRepository: Repository<ProcessEntity>,
     @InjectRepository(ProcessBatchEntity)
     protected readonly batchRepository: Repository<ProcessBatchEntity>,
+    @InjectRepository(BatchProcessStatusEntity)
+    protected readonly batchStatusRepository: Repository<BatchProcessStatusEntity>,
   ) {}
 
-  async onModuleInit() {
-    this.logger.log('🚀 Worker de processamento iniciado!');
+  public async startProcessing(batchId: number) {
+    this.logger.log(
+      `🚀 Worker de processamento ${this.system} iniciado para batch ${batchId}!`,
+    );
     this.logger.log(
       `Paralelização: ${this.CONCURRENT_REQUESTS} requisições simultâneas por lote`,
     );
     this.logger.log(
       `Delay entre lotes: ~${Math.round(this.baseBatchDelay / 1000)}s (com variação aleatória)`,
     );
-    await this.processNextBatch();
-    setInterval(() => {
-      void this.processNextBatch();
-    }, 30000);
+
+    let completed = false;
+
+    while (!completed) {
+      const result = await this.processNextBatch(batchId);
+      completed = result.completedBatch;
+
+      await this.updateBatchStatus(batchId);
+    }
   }
 
   protected abstract processLawSuit(
     process: ProcessEntity,
   ): Promise<HtmlDataReturnType | null>;
+
+  protected async updateBatchStatus(batchId: number) {
+    const totalProcesses = await this.processRepository.count({
+      where: { batchId },
+    });
+    const processedProcesses = await this.processRepository.count({
+      where: { batchId, processed: true },
+    });
+    const errorProcesses = await this.processRepository.count({
+      where: { batchId, processed: false, errorCount: 5 },
+    });
+    const pendingProcesses = totalProcesses - processedProcesses;
+    const percentComplete =
+      totalProcesses > 0 ? (processedProcesses / totalProcesses) * 100 : 0;
+    const status =
+      processedProcesses === totalProcesses ? 'completed' : 'processing';
+
+    let batchStatus = await this.batchStatusRepository.findOne({
+      where: { batchId },
+    });
+    if (!batchStatus) {
+      batchStatus = this.batchStatusRepository.create({ batchId });
+    }
+    batchStatus.totalProcesses = totalProcesses;
+    batchStatus.processedProcesses = processedProcesses;
+    batchStatus.pendingProcesses = pendingProcesses;
+    batchStatus.errorProcesses = errorProcesses;
+    batchStatus.percentComplete = percentComplete;
+    batchStatus.status = status;
+    await this.batchStatusRepository.save(batchStatus);
+  }
 
   private sleep(ms: number) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -54,24 +93,23 @@ export abstract class BaseWorkerService implements OnModuleInit {
     return base + (Math.random() * variance * 2 - variance);
   }
 
-  protected async processNextBatch() {
-    if (this.isProcessing) return;
-    this.isProcessing = true;
-
+  protected async processNextBatch(
+    batchId: number,
+  ): Promise<{ completedBatch: boolean }> {
     try {
       const unprocessedProcesses = await this.processRepository
         .createQueryBuilder('process')
         .innerJoinAndSelect('process.batch', 'batch')
         .where('process.processed = :processed', { processed: false })
         .andWhere('batch.system = :system', { system: this.system })
+        .andWhere('batch.id = :batchId', { batchId })
         .orderBy('process.id', 'ASC')
         .take(100)
         .getMany();
 
       if (unprocessedProcesses.length === 0) {
-        this.logger.log('Nenhum processo pendente. Aguardando 30 segundos...');
-        this.isProcessing = false;
-        return;
+        this.logger.log('Batch concluído!');
+        return { completedBatch: true };
       }
 
       this.logger.log(
@@ -204,10 +242,11 @@ export abstract class BaseWorkerService implements OnModuleInit {
           processed: processedInBatch === totalInBatch,
         });
       }
+
+      return { completedBatch: false };
     } catch (error) {
       this.logger.error('Erro no processamento do lote:', error);
-    } finally {
-      this.isProcessing = false;
+      return { completedBatch: false };
     }
   }
 

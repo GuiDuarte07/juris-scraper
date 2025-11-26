@@ -6,9 +6,35 @@ import {
   BaseProcessService,
   HtmlDataReturnType,
 } from 'src/common/base/base_process.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { ProcessBatchEntity } from 'src/Entities/ProcessBatch.entity';
+import { Repository } from 'typeorm';
+import { ProcessEntity } from 'src/Entities/Process.entity';
+import { InjectQueue } from '@nestjs/bull';
+import type { Queue } from 'bull';
+import { BatchProcessStatusEntity } from 'src/Entities/BatchProcessStatus.entity';
+import { HttpService } from '@nestjs/axios';
 
 @Injectable()
 export class EsajService extends BaseProcessService {
+  constructor(
+    protected readonly httpService: HttpService,
+    @InjectRepository(ProcessBatchEntity)
+    protected readonly batchRepository: Repository<ProcessBatchEntity>,
+    @InjectRepository(ProcessEntity)
+    protected readonly processRepository: Repository<ProcessEntity>,
+    @InjectRepository(BatchProcessStatusEntity)
+    protected readonly batchStatusRepository: Repository<BatchProcessStatusEntity>,
+    @InjectQueue('esaj-process-queue') private readonly esajQueue: Queue,
+  ) {
+    super(
+      httpService,
+      batchRepository,
+      processRepository,
+      batchStatusRepository,
+    );
+  }
+
   protected getExtraHeaders(): Record<string, string> | null {
     return null;
   }
@@ -98,5 +124,27 @@ export class EsajService extends BaseProcessService {
       reqdo: reqdo || 'Requerido não encontrado',
       value: value || 0,
     };
+  }
+
+  public getBatchStatus(batchId: number) {
+    return this.batchStatusRepository
+      .createQueryBuilder('status')
+      .innerJoin('status.batch', 'batch')
+      .where('status.batchId = :batchId', { batchId })
+      .andWhere('batch.system = :system', { system: 'ESAJ' })
+      .getOne();
+  }
+
+  public listProcessingBatches() {
+    return this.batchStatusRepository
+      .createQueryBuilder('status')
+      .innerJoin('status.batch', 'batch')
+      .where('status.status = :status', { status: 'processing' })
+      .andWhere('batch.system = :system', { system: 'ESAJ' })
+      .getMany();
+  }
+
+  protected async addToProcessQueue(batchId: number): Promise<void> {
+    await this.esajQueue.add({ batchId });
   }
 }

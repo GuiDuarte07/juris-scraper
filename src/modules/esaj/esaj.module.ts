@@ -7,16 +7,24 @@ import { ProcessBatchEntity } from 'src/Entities/ProcessBatch.entity';
 import { ProcessService } from '../process/process.service';
 import { ServiceSessionEntity } from 'src/Entities/ServiceSession.entity';
 import { EsajWorkerService } from './esajWorker.service';
+import { BatchProcessStatusEntity } from 'src/Entities/BatchProcessStatus.entity';
+import { BullModule } from '@nestjs/bull';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
+    HttpModule,
     TypeOrmModule.forFeature([
       ProcessEntity,
       ProcessBatchEntity,
       ServiceSessionEntity,
+      BatchProcessStatusEntity,
     ]),
+    BullModule.registerQueue({
+      name: 'esaj-process-queue',
+    }),
   ],
   controllers: [EsajController],
-  providers: [EsajService, ProcessService],
+  providers: [EsajService, ProcessService, EsajWorkerService],
 })
 export class EsajModule {}

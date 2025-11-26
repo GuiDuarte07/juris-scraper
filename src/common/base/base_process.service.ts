@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import iconv from 'iconv-lite';
 import { TextItem } from 'pdfjs-dist/types/src/display/api';
 import { ProcessBatchEntity } from 'src/Entities/ProcessBatch.entity';
@@ -8,32 +8,35 @@ import { InjectRepository } from '@nestjs/typeorm';
 import UtilityClass from 'src/Helpers/UtilityClass';
 import { IProcessHeader } from 'src/modules/process/DTOs/IProcessHeader';
 import { IProcess } from 'src/modules/process/DTOs/ProcessDTO';
-import axios from 'axios';
+import { lastValueFrom } from 'rxjs/internal/lastValueFrom';
+import { HttpService } from '@nestjs/axios';
+import { BatchProcessStatusEntity } from 'src/Entities/BatchProcessStatus.entity';
 export type HtmlDataReturnType = {
   reqdo: string;
   value: number;
 };
 
 @Injectable()
-export abstract class BaseProcessService implements OnModuleInit {
+export abstract class BaseProcessService {
   protected readonly regexCNJ = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/;
 
   protected abstract getExtraHeaders(): Record<string, string> | null;
 
   constructor(
+    protected readonly httpService: HttpService,
     @InjectRepository(ProcessBatchEntity)
     protected readonly batchRepository: Repository<ProcessBatchEntity>,
     @InjectRepository(ProcessEntity)
     protected readonly processRepository: Repository<ProcessEntity>,
+    @InjectRepository(BatchProcessStatusEntity)
+    protected readonly batchStatusRepository: Repository<BatchProcessStatusEntity>,
   ) {}
-
-  onModuleInit() {
-    console.log('BaseProcessService has been initialized');
-  }
 
   public abstract getDataFromHTML(html: string): HtmlDataReturnType;
 
   public abstract getUrl(lawSuitNumber: string): string;
+
+  protected abstract addToProcessQueue(batchId: number): Promise<void>;
 
   public async scrapeLawSuit(
     lawSuitNumber: string,
@@ -108,7 +111,7 @@ export abstract class BaseProcessService implements OnModuleInit {
 
     // Criar o lote (cabeçalho)
     const batch = await this.batchRepository.save({
-      system: headerInfo.system === 'SAJ' ? 'ESAJ' : system,
+      system: headerInfo.system === 'SAJ' ? 'ESAJ' : system.toUpperCase(),
       state: state,
       processDate: headerInfo.processDate,
       description: headerInfo.description,
@@ -118,6 +121,19 @@ export abstract class BaseProcessService implements OnModuleInit {
     });
 
     console.log(`9. Lote criado com ID: ${batch.id}`);
+
+    // Criar o status inicial do lote
+    if (this.batchStatusRepository) {
+      await this.batchStatusRepository.save({
+        batch: batch,
+        batchId: batch.id,
+        status: 'processing',
+        startedAt: new Date(),
+        finishedAt: null,
+        error: null,
+      });
+      console.log('Status do lote inicializado como processing.');
+    }
 
     // Inserir processos em lotes de 500 para melhor performance
     const batchSize = 500;
@@ -149,6 +165,8 @@ export abstract class BaseProcessService implements OnModuleInit {
     }
 
     console.log('10. Todos os processos foram salvos no banco de dados!');
+
+    await this.addToProcessQueue(batch.id);
 
     return {
       batchId: batch.id,
@@ -312,27 +330,29 @@ export abstract class BaseProcessService implements OnModuleInit {
   }
 
   private async fetchData(url: string) {
-    const response = await axios.get<ArrayBuffer>(url, {
-      responseType: 'arraybuffer',
-      headers: {
-        'User-Agent': this.getRandomUserAgent(),
-        ...this.getExtraHeaders(),
-        Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Accept-Encoding': 'gzip, deflate, br',
-        Connection: 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Cache-Control': 'max-age=0',
-      },
-      maxRedirects: 10,
-      timeout: 15000,
-      validateStatus: null,
-      proxy: false,
-    });
+    const response = await lastValueFrom(
+      this.httpService.get<ArrayBuffer>(url, {
+        responseType: 'arraybuffer',
+        headers: {
+          'User-Agent': this.getRandomUserAgent(),
+          ...this.getExtraHeaders(),
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Accept-Encoding': 'gzip, deflate, br',
+          Connection: 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Cache-Control': 'max-age=0',
+        },
+        maxRedirects: 10,
+        timeout: 15000,
+        validateStatus: null,
+        proxy: false,
+      }),
+    );
 
     const buffer = Buffer.from(response.data);
     const html = iconv.decode(buffer, 'latin1');
