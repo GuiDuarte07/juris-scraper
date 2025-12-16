@@ -10,6 +10,7 @@ import { EsajWorkerService } from './esajWorker.service';
 import { BatchProcessStatusEntity } from 'src/Entities/BatchProcessStatus.entity';
 import { BullModule } from '@nestjs/bull';
 import { HttpModule } from '@nestjs/axios';
+import { EsajProcessor } from './esaj.processor';
 
 @Module({
   imports: [
@@ -25,6 +26,6 @@ import { HttpModule } from '@nestjs/axios';
     }),
   ],
   controllers: [EsajController],
-  providers: [EsajService, ProcessService, EsajWorkerService],
+  providers: [EsajService, ProcessService, EsajWorkerService, EsajProcessor],
 })
 export class EsajModule {}

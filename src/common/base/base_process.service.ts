@@ -1,3 +1,4 @@
+import XLSX from 'xlsx';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import iconv from 'iconv-lite';
 import { TextItem } from 'pdfjs-dist/types/src/display/api';
@@ -11,6 +12,8 @@ import { IProcess } from 'src/modules/process/DTOs/ProcessDTO';
 import { lastValueFrom } from 'rxjs/internal/lastValueFrom';
 import { HttpService } from '@nestjs/axios';
 import { BatchProcessStatusEntity } from 'src/Entities/BatchProcessStatus.entity';
+import path from 'path/win32';
+import { ExportProcessExcelResult } from '../types/ExportProcessExcelResult';
 export type HtmlDataReturnType = {
   reqdo: string;
   value: number;
@@ -37,6 +40,20 @@ export abstract class BaseProcessService {
   public abstract getUrl(lawSuitNumber: string): string;
 
   protected abstract addToProcessQueue(batchId: number): Promise<void>;
+
+  public async deleteProcessesByBatchId(batchId: number): Promise<void> {
+    try {
+      await this.processRepository.delete({ batchId }).then(() => {});
+
+      await this.batchRepository.delete({ id: batchId }).then(() => {});
+
+      await this.batchStatusRepository.delete({ batchId }).then(() => {});
+    } catch (error) {
+      throw new BadRequestException(
+        `Erro ao deletar processos e lote com batchId ${batchId}: ${error}`,
+      );
+    }
+  }
 
   public async scrapeLawSuit(
     lawSuitNumber: string,
@@ -174,6 +191,83 @@ export abstract class BaseProcessService {
       duplicatesIgnored: duplicateCount,
       system: system,
       state: state,
+    };
+  }
+
+  public async exportProcessToExcel(
+    batchId: number,
+  ): Promise<ExportProcessExcelResult> {
+    const batch = await this.batchRepository.findOne({
+      where: { id: batchId },
+    });
+
+    if (!batch) {
+      throw new BadRequestException(`Lote com ID ${batchId} não encontrado`);
+    }
+
+    const processes = await this.processRepository.find({
+      where: { batchId },
+      order: { id: 'ASC' },
+    });
+
+    if (processes.length === 0) {
+      throw new BadRequestException(
+        `Nenhum processo encontrado no lote ${batchId}`,
+      );
+    }
+
+    const excelData = processes.map((p) => ({
+      Processo: p.processo,
+      Comarca: p.comarca,
+      Foro: p.foro,
+      Vara: p.vara,
+      Classe: p.classe,
+      Valor: p.valor,
+      Requerido: p.requerido,
+      Status: p.processed ? 'Processado' : 'Pendente',
+    }));
+
+    // Criar a worksheet
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+    // Ajustar larguras das colunas
+    const columnWidths = [
+      { wch: 30 }, // Processo
+      { wch: 25 }, // Comarca
+      { wch: 30 }, // Foro
+      { wch: 40 }, // Vara
+      { wch: 30 }, // Classe
+      { wch: 20 }, // Valor
+      { wch: 50 }, // Requerido
+      { wch: 12 }, // Status
+    ];
+    worksheet['!cols'] = columnWidths;
+
+    // Criar o workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Processos');
+
+    // Gerar nome do arquivo
+    const dateStr = new Date(batch.processDate).toISOString().split('T')[0];
+    const filename = `processos_${batch.system}_${batch.state}_${dateStr}_${batchId}.xlsx`;
+    const filePath = path.resolve(filename);
+
+    // Escrever o arquivo
+    XLSX.writeFile(workbook, filePath);
+
+    console.log(`Arquivo Excel criado: ${filePath}`);
+
+    return {
+      filePath,
+      filename,
+      totalProcesses: processes.length,
+      processedCount: processes.filter((p) => p.processed).length,
+      batch: {
+        id: batch.id,
+        system: batch.system,
+        state: batch.state,
+        date: batch.processDate,
+      },
     };
   }
 

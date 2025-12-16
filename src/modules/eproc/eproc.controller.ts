@@ -1,10 +1,15 @@
+import * as fs from 'fs';
 import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  InternalServerErrorException,
   Param,
   Post,
+  Res,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -16,6 +21,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 
 @Controller('eproc')
 export class EprocController {
@@ -129,6 +135,21 @@ export class EprocController {
       'bytes',
     );
 
+    // Verifica se o cookie está atualizado
+    const session = await this.eprocService.getSessionId();
+
+    if (!session || !session.cookie) {
+      throw new BadRequestException(
+        'Sessão inválida. Defina o PHPSESSID antes de importar o PDF.',
+      );
+    }
+
+    if (session.expiresAt <= new Date()) {
+      throw new BadRequestException(
+        'Sessão expirada. Atualize o PHPSESSID antes de importar o PDF.',
+      );
+    }
+
     // Chamar o serviço para importar o PDF
     const result = await this.eprocService.importPdfToDatabase(
       file.buffer,
@@ -143,13 +164,68 @@ export class EprocController {
     };
   }
 
+  @ApiOperation({
+    summary:
+      'Retorna o status de processamento do lote de processos importados via PDF',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Status do lote retornado com sucesso.',
+  })
   @Get('batch/:batchId')
   async getBatchStatus(@Param('batchId') batchId: number) {
     return await this.eprocService.getBatchStatus(batchId);
   }
 
+  @ApiOperation({
+    summary: 'Lista todos os lotes de processos que estão em processamento',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de lotes em processamento retornada com sucesso.',
+  })
   @Get('batch')
   async listProcessingBatches() {
     return await this.eprocService.listProcessingBatches();
+  }
+
+  @ApiOperation({
+    summary: 'Deletar todos os processos de um lote específico',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Lote deletado com sucesso.',
+  })
+  @Delete('batch/:batchId')
+  @HttpCode(204)
+  async deleteBatch(@Param('batchId') batchId: number) {
+    return await this.eprocService.deleteProcessesByBatchId(batchId);
+  }
+
+  @Get('/export/batch/:batchId')
+  @ApiOperation({ summary: 'Exportar processos de um lote para Excel' })
+  async exportBatchToExcel(
+    @Param('batchId') batchId: number,
+    @Res() res: Response,
+  ) {
+    try {
+      if (isNaN(Number(batchId))) {
+        throw new BadRequestException('ID do lote inválido');
+      }
+
+      const result = await this.eprocService.exportProcessToExcel(batchId);
+      res.download(result.filePath, result.filename, (err?: Error) => {
+        if (err) {
+          console.error('Erro ao enviar arquivo:', err);
+        }
+        // Deletar arquivo após envio
+        fs.unlinkSync(result.filePath);
+      });
+    } catch (err) {
+      console.error(err);
+      throw new InternalServerErrorException(
+        'Erro ao exportar lote para Excel',
+      );
+    }
   }
 }

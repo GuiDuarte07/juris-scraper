@@ -97,4 +97,40 @@ export class ProcessService {
       },
     };
   }
+
+  /**
+   * Atualiza os dados de contato de um processo
+   * @param {number} processId - ID do processo
+   * @param {Partial<ProcessEntity>} updateData - Dados a atualizar (contato, contatoRealizado, observacoes)
+   * @returns {ProcessEntity} - Processo atualizado
+   */
+  public async updateProcessContact(
+    processId: number,
+    updateData: {
+      contato?: string;
+      contatoRealizado?: boolean;
+      observacoes?: string;
+    },
+  ): Promise<ProcessEntity> {
+    const process = await this.processRepository.findOne({
+      where: { id: processId },
+    });
+
+    if (!process) {
+      throw new Error(`Processo com ID ${processId} não encontrado`);
+    }
+
+    // Atualizar apenas os campos fornecidos
+    if (updateData.contato !== undefined) {
+      process.contato = updateData.contato;
+    }
+    if (updateData.contatoRealizado !== undefined) {
+      process.contatoRealizado = updateData.contatoRealizado;
+    }
+    if (updateData.observacoes !== undefined) {
+      process.observacoes = updateData.observacoes;
+    }
+
+    return await this.processRepository.save(process);
+  }
 }

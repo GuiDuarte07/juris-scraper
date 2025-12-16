@@ -2,7 +2,7 @@ import { Processor, Process } from '@nestjs/bull';
 import type { Job } from 'bull';
 import { EprocWorkerService } from './eprocWorker.service';
 
-@Processor('eproc-queue')
+@Processor('eproc-process-queue')
 export class EprocProcessor {
   constructor(private readonly eprocWorkerService: EprocWorkerService) {}
 

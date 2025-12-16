@@ -212,13 +212,13 @@ export class EprocService extends BaseProcessService {
     };
   }
 
-  public async getSessionId() {
+  public async getSessionId(): Promise<{ cookie: string; expiresAt: Date }> {
     if (
       this.PHPSESSID &&
       this.sessionExpiresAt &&
       this.isSessionExpired(this.sessionExpiresAt)
     )
-      return this.PHPSESSID;
+      return { cookie: this.PHPSESSID, expiresAt: this.sessionExpiresAt };
 
     const session = await this.serviceSessionRepository.findOne({
       where: { service_name: 'eproc' },
@@ -234,7 +234,7 @@ export class EprocService extends BaseProcessService {
 
     this.PHPSESSID = session.session_id;
     this.sessionExpiresAt = session.expires_at;
-    return this.PHPSESSID;
+    return { cookie: session.session_id, expiresAt: session.expires_at };
   }
 
   public getBatchStatus(batchId: number) {

@@ -49,6 +49,29 @@ export class ProcessEntity {
   requerido?: string;
 
   @Column({
+    type: 'varchar',
+    length: 40,
+    nullable: true,
+    comment: 'Forma de contato do requerido',
+  })
+  contato: string;
+
+  @Column({
+    type: 'boolean',
+    default: false,
+    comment: 'Se já foi entrado em contato com o requerido',
+  })
+  contatoRealizado: boolean;
+
+  @Column({
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+    comment: 'Observações sobre o contato',
+  })
+  observacoes: string;
+
+  @Column({
     type: 'boolean',
     default: false,
     comment: 'Se o processo já foi enriquecido com dados do site',

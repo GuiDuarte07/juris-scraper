@@ -56,6 +56,6 @@ export class ProcessBatchEntity {
   @UpdateDateColumn({ type: 'timestamp' })
   updatedAt: Date;
 
-  @OneToMany(() => ProcessEntity, (process) => process.batch)
+  @OneToMany(() => ProcessEntity, (process) => process.batch, { cascade: true })
   processes: ProcessEntity[];
 }

@@ -2,7 +2,7 @@ import { EsajWorkerService } from './esajWorker.service';
 import { Processor, Process } from '@nestjs/bull';
 import type { Job } from 'bull';
 
-@Processor('esaj-queue')
+@Processor('esaj-process-queue')
 export class EsajProcessor {
   constructor(private readonly esajWorkerService: EsajWorkerService) {}
 
