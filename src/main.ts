@@ -11,6 +11,10 @@ import { Queue } from 'bull';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Habilita CORS para permitir chamadas do frontend (ex: http://localhost:3000)
+  // Ajuste a origem conforme necessário para produção
+  app.enableCors({ origin: ['http://localhost:3000'], credentials: true });
+
   // Obtenha o ConfigService do contexto da aplicação para garantir a leitura correta
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT') || 3000;

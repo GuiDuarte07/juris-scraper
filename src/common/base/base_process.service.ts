@@ -79,7 +79,7 @@ export abstract class BaseProcessService {
 
       return result;
     } catch (err) {
-      throw new Error(err);
+      throw new Error(String(err));
     }
   }
 

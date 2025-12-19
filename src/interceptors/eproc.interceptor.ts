@@ -7,7 +7,7 @@ export function setupEprocInterceptor(eprocService: EprocService) {
       const target = 'https://eproc1g-consulta.tjsp.jus.br/eproc';
       if (config.url?.startsWith(target)) {
         const sessionId = await eprocService.getSessionId();
-        config.headers['Cookie'] = `PHPSESSID=${sessionId}`;
+        config.headers['Cookie'] = `PHPSESSID=${sessionId.cookie}`;
       }
       return config;
     });

@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ProcessBatchEntity } from 'src/Entities/ProcessBatch.entity';
 import { ProcessEntity } from 'src/Entities/Process.entity';
+import { BatchProcessStatusEntity } from 'src/Entities/BatchProcessStatus.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import XLSX from 'xlsx';
 import path from 'path';
+import { BatchWithStatusDTO } from './DTOs/BatchWithStatusDTO';
 
 @Injectable()
 export class ProcessService {
@@ -13,6 +15,8 @@ export class ProcessService {
     private readonly batchRepository: Repository<ProcessBatchEntity>,
     @InjectRepository(ProcessEntity)
     private readonly processRepository: Repository<ProcessEntity>,
+    @InjectRepository(BatchProcessStatusEntity)
+    private readonly statusRepository: Repository<BatchProcessStatusEntity>,
   ) {}
 
   /**
@@ -132,5 +136,220 @@ export class ProcessService {
     }
 
     return await this.processRepository.save(process);
+  }
+
+  /**
+   * Busca processos com paginação, ordenação e filtros
+   */
+  public async getProcesses(options: {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    order?: 'ASC' | 'DESC';
+    contatoFilled?: boolean;
+    contatoRealizado?: boolean;
+    processed?: boolean;
+    batchId?: number;
+    search?: string;
+  }) {
+    const page = options.page && options.page > 0 ? options.page : 1;
+    const limit = options.limit && options.limit > 0 ? options.limit : 50;
+    const sortBy = options.sortBy || 'updatedAt';
+    const order = options.order === 'ASC' ? 'ASC' : 'DESC';
+
+    const qb = this.processRepository.createQueryBuilder('process');
+
+    // filtros
+    if (options.batchId) {
+      qb.andWhere('process.batchId = :batchId', { batchId: options.batchId });
+    }
+
+    if (options.contatoFilled !== undefined) {
+      if (options.contatoFilled) {
+        qb.andWhere("process.contato IS NOT NULL AND process.contato <> ''");
+      } else {
+        qb.andWhere("process.contato IS NULL OR process.contato = ''");
+      }
+    }
+
+    if (options.contatoRealizado !== undefined) {
+      qb.andWhere('process.contatoRealizado = :contatoRealizado', {
+        contatoRealizado: options.contatoRealizado,
+      });
+    }
+
+    if (options.processed !== undefined) {
+      qb.andWhere('process.processed = :processed', {
+        processed: options.processed,
+      });
+    }
+
+    if (options.search) {
+      qb.andWhere('process.processo ILIKE :search', {
+        search: `%${options.search}%`,
+      });
+    }
+
+    // total
+    const total = await qb.getCount();
+
+    // ordenação e paginação
+    qb.orderBy(`process.${sortBy}`, order);
+    qb.skip((page - 1) * limit).take(limit);
+
+    const items = await qb.getMany();
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    };
+  }
+
+  /**
+   * Retorna status de um lote pelo ID
+   * @param {number} batchId - ID do lote
+   * @returns {BatchWithStatusDTO} - Dados da batch com status
+   */
+  public async getBatchStatus(
+    batchId: number,
+  ): Promise<BatchWithStatusDTO | null> {
+    const batch = await this.batchRepository.findOne({
+      where: { id: batchId },
+    });
+
+    if (!batch) {
+      return null;
+    }
+
+    const status = await this.statusRepository.findOne({
+      where: { batchId },
+    });
+
+    const totalProcesses = await this.processRepository.count({
+      where: { batchId },
+    });
+
+    const processedCount = await this.processRepository.count({
+      where: { batchId, processed: true },
+    });
+
+    const remainingCount = totalProcesses - processedCount;
+    const progress =
+      totalProcesses > 0 ? (processedCount / totalProcesses) * 100 : 0;
+
+    return {
+      id: batch.id,
+      system: batch.system,
+      state: batch.state,
+      processDate: batch.processDate,
+      description: batch.description,
+      processed: batch.processed,
+      status: status
+        ? {
+            id: status.id,
+            batchId: status.batchId,
+            totalProcesses: status.totalProcesses,
+            processedProcesses: status.processedProcesses,
+            processedCount,
+            pendingProcesses: remainingCount,
+            errorProcesses: status.errorProcesses,
+            percentComplete: status.percentComplete,
+            progress,
+            status: status.status,
+            createdAt: status.createdAt,
+            updatedAt: status.updatedAt,
+          }
+        : null,
+    } as BatchWithStatusDTO;
+  }
+
+  /**
+   * Lista lotes em processamento
+   * @param {string} system - Filtro opcional por sistema (EPROC ou ESAJ)
+   * @returns {BatchWithStatusDTO[]} - Array de lotes com status
+   */
+  public async listProcessingBatches(
+    system?: string,
+  ): Promise<BatchWithStatusDTO[]> {
+    const qb = this.batchRepository.createQueryBuilder('batch');
+
+    if (system) {
+      const normalizedSystem = system.toUpperCase();
+      qb.andWhere('batch.system = :system', { system: normalizedSystem });
+    }
+
+    const batches = await qb.getMany();
+
+    // Enriquecer com contagem de processos e status
+    const enrichedBatches = await Promise.all(
+      batches.map(async (batch): Promise<BatchWithStatusDTO> => {
+        const totalProcesses = await this.processRepository.count({
+          where: { batchId: batch.id },
+        });
+
+        const processedCount = await this.processRepository.count({
+          where: { batchId: batch.id, processed: true },
+        });
+
+        const remainingCount = totalProcesses - processedCount;
+        const progress =
+          totalProcesses > 0 ? (processedCount / totalProcesses) * 100 : 0;
+
+        const batchStatus = await this.statusRepository.findOne({
+          where: { batchId: batch.id },
+        });
+
+        return {
+          id: batch.id,
+          system: batch.system,
+          state: batch.state,
+          processDate: batch.processDate,
+          description: batch.description,
+          processed: batch.processed,
+          status: batchStatus
+            ? {
+                id: batchStatus.id,
+                batchId: batchStatus.batchId,
+                totalProcesses: batchStatus.totalProcesses,
+                processedProcesses: batchStatus.processedProcesses,
+                processedCount,
+                pendingProcesses: remainingCount,
+                errorProcesses: batchStatus.errorProcesses,
+                percentComplete: batchStatus.percentComplete,
+                progress,
+                status: batchStatus.status,
+                createdAt: batchStatus.createdAt,
+                updatedAt: batchStatus.updatedAt,
+              }
+            : undefined,
+        };
+      }),
+    );
+
+    return enrichedBatches;
+  }
+
+  /**
+   * Deleta todos os processos de um lote
+   * @param {number} batchId - ID do lote
+   */
+  public async deleteProcessesByBatchId(batchId: number) {
+    const batch = await this.batchRepository.findOne({
+      where: { id: batchId },
+    });
+
+    if (!batch) {
+      throw new Error(`Lote com ID ${batchId} não encontrado`);
+    }
+
+    await this.processRepository.delete({ batchId });
+    await this.batchRepository.delete({ id: batchId });
+
+    return {
+      message: `Lote ${batchId} e todos seus processos foram deletados`,
+    };
   }
 }

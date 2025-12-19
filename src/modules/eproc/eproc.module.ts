@@ -21,6 +21,12 @@ import { HttpModule } from '@nestjs/axios';
     ]),
     BullModule.registerQueue({
       name: 'eproc-process-queue',
+      defaultJobOptions: {
+        attempts: Number.MAX_SAFE_INTEGER,
+        backoff: { type: 'fixed', delay: 5000 },
+        removeOnComplete: true,
+        removeOnFail: false,
+      },
     }),
   ],
   controllers: [EprocController],

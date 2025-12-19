@@ -23,6 +23,12 @@ import { EsajProcessor } from './esaj.processor';
     ]),
     BullModule.registerQueue({
       name: 'esaj-process-queue',
+      defaultJobOptions: {
+        attempts: Number.MAX_SAFE_INTEGER,
+        backoff: { type: 'fixed', delay: 5000 },
+        removeOnComplete: true,
+        removeOnFail: false,
+      },
     }),
   ],
   controllers: [EsajController],
