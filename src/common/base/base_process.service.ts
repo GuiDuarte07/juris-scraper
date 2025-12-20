@@ -119,12 +119,17 @@ export abstract class BaseProcessService {
     }
 
     if (newProcesses.length === 0) {
+      const batchIdExisting = existingProcesses[0]?.batchId;
+
+      if (batchIdExisting) {
+        await this.addToProcessQueue(batchIdExisting);
+      }
       throw new Error(
         'Todos os processos já existem no banco de dados. Nenhum processo novo foi encontrado.',
       );
     }
 
-    console.log(`   ✓ ${newProcesses.length} processos novos serão importados`);
+    console.log(`✓ ${newProcesses.length} processos novos serão importados`);
 
     // Criar o lote (cabeçalho)
     const batch = await this.batchRepository.save({

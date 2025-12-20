@@ -12,6 +12,10 @@ import { BullModule } from '@nestjs/bull';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: '.env',
+    }),
     HttpModule,
     EprocModule,
     EsajModule,
@@ -20,15 +24,15 @@ import { BullModule } from '@nestjs/bull';
       inject: [ConfigService],
       useFactory: (config: ConfigService) => databaseConfig(config),
     }),
-    ConfigModule.forRoot({
-      isGlobal: true,
-      envFilePath: '.env',
-    }),
-    BullModule.forRoot({
-      redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT!, 10) || 6379,
-      },
+
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        redis: {
+          host: config.get<string>('REDIS_HOST'),
+          port: config.get<number>('REDIS_PORT'),
+        },
+      }),
     }),
   ],
   controllers: [AppController],
