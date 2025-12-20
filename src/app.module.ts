@@ -7,7 +7,7 @@ import { ProcessModule } from './modules/process/process.module';
 import { EsajModule } from './modules/esaj/esaj.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { databaseConfig } from './config/database.config';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bull';
 
 @Module({
@@ -16,7 +16,10 @@ import { BullModule } from '@nestjs/bull';
     EprocModule,
     EsajModule,
     ProcessModule,
-    TypeOrmModule.forRoot(databaseConfig),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => databaseConfig(config),
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
