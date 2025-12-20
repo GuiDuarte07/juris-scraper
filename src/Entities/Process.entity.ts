@@ -79,6 +79,13 @@ export class ProcessEntity {
   processed: boolean;
 
   @Column({
+    type: 'boolean',
+    default: false,
+    comment: 'Se o processo falhou ao ser processado',
+  })
+  failed: boolean;
+
+  @Column({
     type: 'integer',
     default: 0,
     comment: 'Número de tentativas falhadas',

@@ -156,7 +156,9 @@ export abstract class BaseWorkerService {
                 return { success: true, process };
               } catch (err) {
                 const errorMessage =
-                  err instanceof Error ? err.message : String(err);
+                  err instanceof Error
+                    ? err.stack || err.message
+                    : JSON.stringify(err);
 
                 this.consecutiveErrors++;
 
@@ -169,14 +171,21 @@ export abstract class BaseWorkerService {
                   `Erro ao processar ${process.processo}: ${errorMessage}`,
                 );
 
-                if (process.errorCount >= 5) {
+                if (
+                  process.errorCount >= 5 ||
+                  (process.errorCount > 1 && this.consecutiveErrors > 15)
+                ) {
                   this.logger.warn(
                     `Processo ${process.processo} falhou ${process.errorCount} vezes. Marcando como processado.`,
                   );
 
                   process.processed = true;
-                  process.valor = 0;
-                  process.requerido = 'ERRO_MÚLTIPLAS_TENTATIVAS';
+                  process.lastError = 'MÁXIMO_DE_TENTATIVAS_EXCEDIDO';
+                  process.valor = undefined;
+                  process.requerido = undefined;
+                  process.failed = true;
+
+                  this.consecutiveErrors = 0;
                   await this.processRepository.save(process);
                 }
                 return { success: false, process, errorMessage };
