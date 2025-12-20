@@ -23,7 +23,7 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASS}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_juris_db:/var/lib/postgresql/data
     restart: always
 
   redis:
