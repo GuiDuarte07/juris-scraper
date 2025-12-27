@@ -138,6 +138,31 @@ export class EsajController {
       ...result,
     };
   }
+
+  @ApiOperation({
+    summary: 'Lista todos os lotes (todos os status) para o ESAJ',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de lotes retornada com sucesso.',
+  })
+  @Get('batch')
+  async listAllBatches() {
+    return await this.esajService.listAllBatches();
+  }
+
+  @ApiOperation({
+    summary: 'Lista todos os lotes de processos que estão em processamento',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de lotes em processamento retornada com sucesso.',
+  })
+  @Get('batch/processing')
+  async listProcessingBatches() {
+    return await this.esajService.listProcessingBatches();
+  }
+
   @ApiOperation({
     summary:
       'Retorna o status de processamento do lote de processos importados via PDF',
@@ -151,17 +176,6 @@ export class EsajController {
     return await this.esajService.getBatchStatus(batchId);
   }
 
-  @ApiOperation({
-    summary: 'Lista todos os lotes de processos que estão em processamento',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista de lotes em processamento retornada com sucesso.',
-  })
-  @Get('batch')
-  async listProcessingBatches() {
-    return await this.esajService.listProcessingBatches();
-  }
   @ApiOperation({
     summary: 'Deletar todos os processos de um lote específico',
   })

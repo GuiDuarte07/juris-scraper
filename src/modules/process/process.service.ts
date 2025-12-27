@@ -145,37 +145,25 @@ export class ProcessService {
     page?: number;
     limit?: number;
     sortBy?: string;
-    order?: 'ASC' | 'DESC';
-    contatoFilled?: boolean;
-    contatoRealizado?: boolean;
+    sortOrder?: 'asc' | 'desc';
     processed?: boolean;
     batchId?: number;
-    search?: string;
+    // advanced filters: array of { field, operator, value }
+    filters?: Array<{ field: string; operator: string; value: any }>;
   }) {
     const page = options.page && options.page > 0 ? options.page : 1;
     const limit = options.limit && options.limit > 0 ? options.limit : 50;
     const sortBy = options.sortBy || 'updatedAt';
-    const order = options.order === 'ASC' ? 'ASC' : 'DESC';
+    const order =
+      options.sortOrder && options.sortOrder.toUpperCase() === 'ASC'
+        ? 'ASC'
+        : 'DESC';
 
     const qb = this.processRepository.createQueryBuilder('process');
 
-    // filtros
+    // Simple filters
     if (options.batchId) {
       qb.andWhere('process.batchId = :batchId', { batchId: options.batchId });
-    }
-
-    if (options.contatoFilled !== undefined) {
-      if (options.contatoFilled) {
-        qb.andWhere("process.contato IS NOT NULL AND process.contato <> ''");
-      } else {
-        qb.andWhere("process.contato IS NULL OR process.contato = ''");
-      }
-    }
-
-    if (options.contatoRealizado !== undefined) {
-      qb.andWhere('process.contatoRealizado = :contatoRealizado', {
-        contatoRealizado: options.contatoRealizado,
-      });
     }
 
     if (options.processed !== undefined) {
@@ -184,11 +172,117 @@ export class ProcessService {
       });
     }
 
-    if (options.search) {
-      qb.andWhere('process.processo ILIKE :search', {
-        search: `%${options.search}%`,
+    // Apply advanced filters if provided (array of { field, operator, value })
+    // Supported operators: equals, notEquals, contains, startsWith, endsWith,
+    // greaterThan, lessThan, greaterOrEqual, lessOrEqual, true, false, all
+    if (
+      options.filters &&
+      Array.isArray(options.filters) &&
+      options.filters.length > 0
+    ) {
+      options.filters.forEach((f, idx) => {
+        if (!f || !f.field) return;
+        const field = String(f.field).replace(/[^a-zA-Z0-9_]/g, '');
+        const param = `filter_${idx}`;
+        const rawValue: any = f.value;
+
+        switch (f.operator) {
+          case 'equals': {
+            if (rawValue === null) {
+              qb.andWhere(`process.${field} IS NULL`);
+            } else if (
+              typeof rawValue === 'number' ||
+              !isNaN(Number(rawValue))
+            ) {
+              qb.andWhere(`process.${field} = :${param}`, {
+                [param]: Number(rawValue),
+              });
+            } else {
+              qb.andWhere(`process.${field} ILIKE :${param}`, {
+                [param]: String(rawValue),
+              });
+            }
+            break;
+          }
+          case 'notEquals': {
+            if (rawValue === null) {
+              qb.andWhere(`process.${field} IS NOT NULL`);
+            } else if (
+              typeof rawValue === 'number' ||
+              !isNaN(Number(rawValue))
+            ) {
+              qb.andWhere(`process.${field} <> :${param}`, {
+                [param]: Number(rawValue),
+              });
+            } else {
+              qb.andWhere(`process.${field} NOT ILIKE :${param}`, {
+                [param]: String(rawValue),
+              });
+            }
+            break;
+          }
+          case 'contains': {
+            qb.andWhere(`process.${field} ILIKE :${param}`, {
+              [param]: `%${String(rawValue)}%`,
+            });
+            break;
+          }
+          case 'startsWith': {
+            qb.andWhere(`process.${field} ILIKE :${param}`, {
+              [param]: `${String(rawValue)}%`,
+            });
+            break;
+          }
+          case 'endsWith': {
+            qb.andWhere(`process.${field} ILIKE :${param}`, {
+              [param]: `%${String(rawValue)}`,
+            });
+            break;
+          }
+          case 'greaterThan': {
+            qb.andWhere(`process.${field} > :${param}`, {
+              [param]: Number(rawValue),
+            });
+            break;
+          }
+          case 'lessThan': {
+            qb.andWhere(`process.${field} < :${param}`, {
+              [param]: Number(rawValue),
+            });
+            break;
+          }
+          case 'greaterOrEqual': {
+            qb.andWhere(`process.${field} >= :${param}`, {
+              [param]: Number(rawValue),
+            });
+            break;
+          }
+          case 'lessOrEqual': {
+            qb.andWhere(`process.${field} <= :${param}`, {
+              [param]: Number(rawValue),
+            });
+            break;
+          }
+          case 'true': {
+            qb.andWhere(`process.${field} = :${param}`, { [param]: true });
+            break;
+          }
+          case 'false': {
+            qb.andWhere(`process.${field} = :${param}`, { [param]: false });
+            break;
+          }
+          case 'all':
+          default:
+            break;
+        }
       });
     }
+
+    // Filtrar requerido não vazio e diferente de REPROCESSAR
+    qb.andWhere(
+      "process.requerido IS NOT NULL AND process.requerido <> '' AND process.requerido <> :reprocessar",
+      { reprocessar: 'REPROCESSAR' },
+    );
 
     // total
     const total = await qb.getCount();

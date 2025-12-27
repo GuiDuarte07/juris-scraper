@@ -93,38 +93,42 @@ export class ProcessController {
     @Query('page') page = '1',
     @Query('limit') limit = '50',
     @Query('sortBy') sortBy = 'updatedAt',
-    @Query('order') order: 'ASC' | 'DESC' = 'DESC',
-    @Query('contatoFilled') contatoFilled?: string,
-    @Query('contatoRealizado') contatoRealizado?: string,
+    @Query('sortOrder') sortOrder: 'asc' | 'desc' = 'desc',
     @Query('processed') processed?: string,
     @Query('batchId') batchId?: string,
-    @Query('search') search?: string,
+    @Query('filters') filtersParam?: string,
   ) {
     const parsedPage = Number(page) || 1;
     const parsedLimit = Number(limit) || 50;
     const parsedBatchId = batchId ? Number(batchId) : undefined;
+    const parsedProcessed =
+      processed !== undefined
+        ? processed === 'true' || processed === '1'
+        : undefined;
 
-    const filters: any = {
+    // Parse advanced filters from JSON string
+    let parsedFilters: Array<{ field: string; operator: string; value: any }> =
+      [];
+    if (filtersParam) {
+      try {
+        const decoded = decodeURIComponent(filtersParam);
+        parsedFilters = JSON.parse(decoded) as typeof parsedFilters;
+      } catch (error) {
+        console.warn('Failed to parse filters:', error);
+        parsedFilters = [];
+      }
+    }
+
+    const result = await this.processService.getProcesses({
       page: parsedPage,
       limit: parsedLimit,
       sortBy,
-      order: order === 'ASC' ? 'ASC' : 'DESC',
+      sortOrder,
+      processed: parsedProcessed,
       batchId: parsedBatchId,
-    };
+      filters: parsedFilters.length > 0 ? parsedFilters : undefined,
+    });
 
-    if (contatoFilled !== undefined) {
-      filters.contatoFilled = contatoFilled === 'true' || contatoFilled === '1';
-    }
-    if (contatoRealizado !== undefined) {
-      filters.contatoRealizado =
-        contatoRealizado === 'true' || contatoRealizado === '1';
-    }
-    if (processed !== undefined) {
-      filters.processed = processed === 'true' || processed === '1';
-    }
-    if (search) filters.search = search;
-
-    const result = await this.processService.getProcesses(filters);
     return result;
   }
 

@@ -276,6 +276,17 @@ export abstract class BaseProcessService {
     };
   }
 
+  public async listAllBatches(system?: string): Promise<ProcessBatchEntity[]> {
+    if (system) {
+      return this.batchRepository.find({
+        where: { system },
+        order: { id: 'DESC' },
+      });
+    }
+
+    return this.batchRepository.find({ order: { id: 'DESC' } });
+  }
+
   private async processPdfToArray(
     pdfBuffer: Express.Multer.File['buffer'],
   ): Promise<{

@@ -165,6 +165,30 @@ export class EprocController {
   }
 
   @ApiOperation({
+    summary: 'Lista todos os lotes (todos os status) para o EPROC',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de lotes retornada com sucesso.',
+  })
+  @Get('batch')
+  async listAllBatches() {
+    return await this.eprocService.listAllBatches();
+  }
+
+  @ApiOperation({
+    summary: 'Lista todos os lotes de processos que estão em processamento',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de lotes em processamento retornada com sucesso.',
+  })
+  @Get('batch/processing')
+  async listProcessingBatches() {
+    return await this.eprocService.listProcessingBatches();
+  }
+
+  @ApiOperation({
     summary:
       'Retorna o status de processamento do lote de processos importados via PDF',
   })
@@ -175,18 +199,6 @@ export class EprocController {
   @Get('batch/:batchId')
   async getBatchStatus(@Param('batchId') batchId: number) {
     return await this.eprocService.getBatchStatus(batchId);
-  }
-
-  @ApiOperation({
-    summary: 'Lista todos os lotes de processos que estão em processamento',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Lista de lotes em processamento retornada com sucesso.',
-  })
-  @Get('batch')
-  async listProcessingBatches() {
-    return await this.eprocService.listProcessingBatches();
   }
 
   @ApiOperation({
