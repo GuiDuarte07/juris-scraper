@@ -54,7 +54,10 @@ export class ProcessService {
       Valor: p.valor || 'Não processado',
       Requerido: p.requerido || 'Não processado',
       Status: p.processed ? 'Processado' : 'Pendente',
-      Erros: p.errorCount || 0,
+      Contato: p.contato || '',
+      contatato:
+        p.contatoRealizado !== undefined ? String(p.contatoRealizado) : '',
+      observações: p.observacoes || '',
     }));
 
     // Criar a worksheet
@@ -70,7 +73,9 @@ export class ProcessService {
       { wch: 20 }, // Valor
       { wch: 50 }, // Requerido
       { wch: 12 }, // Status
-      { wch: 8 }, // Erros
+      { wch: 18 }, // Contato
+      { wch: 10 }, // contatato
+      { wch: 50 }, // observações
     ];
     worksheet['!cols'] = columnWidths;
 
@@ -424,6 +429,27 @@ export class ProcessService {
     );
 
     return enrichedBatches;
+  }
+
+  /**
+   * Deleta um processo específico
+   * @param {number} processId - ID do processo
+   */
+  public async deleteProcessById(processId: number) {
+    const process = await this.processRepository.findOne({
+      where: { id: processId },
+    });
+
+    if (!process) {
+      throw new Error(`Processo com ID ${processId} não encontrado`);
+    }
+
+    await this.processRepository.delete({ id: processId });
+
+    return {
+      message: `Processo ${processId} foi deletado com sucesso`,
+      processId,
+    };
   }
 
   /**

@@ -13,8 +13,10 @@ import {
   Res,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { EsajService } from './esaj.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import {
@@ -25,6 +27,7 @@ import {
 } from '@nestjs/swagger';
 
 @Controller('esaj')
+@UseGuards(JwtAuthGuard)
 export class EsajController {
   constructor(
     private readonly esajService: EsajService,

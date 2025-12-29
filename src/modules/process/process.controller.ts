@@ -9,13 +9,16 @@ import {
   Res,
   Delete,
   InternalServerErrorException,
+  UseGuards,
 } from '@nestjs/common';
 import { ProcessService } from './process.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import type { Response } from 'express';
 import * as fs from 'fs';
 
 @Controller('process')
+@UseGuards(JwtAuthGuard)
 export class ProcessController {
   constructor(private readonly processService: ProcessService) {}
 
@@ -159,6 +162,24 @@ export class ProcessController {
   })
   async listProcessingBatchesUnified() {
     return await this.processService.listProcessingBatches();
+  }
+
+  @Delete(':processId')
+  @ApiOperation({
+    summary: 'Deleta um processo específico',
+  })
+  async deleteProcess(@Param('processId') processId: number) {
+    if (isNaN(Number(processId))) {
+      throw new BadRequestException('ID do processo inválido');
+    }
+
+    try {
+      return await this.processService.deleteProcessById(Number(processId));
+    } catch (error: any) {
+      throw new BadRequestException(
+        error.message || 'Erro ao deletar processo',
+      );
+    }
   }
 
   @Delete('batch/:batchId')

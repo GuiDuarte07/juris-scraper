@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { EprocModule } from './modules/eproc/eproc.module';
 import { ProcessModule } from './modules/process/process.module';
 import { EsajModule } from './modules/esaj/esaj.module';
+import { AuthModule } from './modules/auth/auth.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { databaseConfig } from './config/database.config';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -17,6 +18,7 @@ import { BullModule } from '@nestjs/bull';
       envFilePath: '.env',
     }),
     HttpModule,
+    AuthModule,
     EprocModule,
     EsajModule,
     ProcessModule,

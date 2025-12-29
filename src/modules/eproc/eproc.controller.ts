@@ -12,8 +12,10 @@ import {
   Res,
   UploadedFile,
   UseInterceptors,
+  UseGuards,
 } from '@nestjs/common';
 import { EprocService } from './eproc.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
   ApiBody,
   ApiConsumes,
@@ -24,6 +26,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 
 @Controller('eproc')
+@UseGuards(JwtAuthGuard)
 export class EprocController {
   constructor(private readonly eprocService: EprocService) {}
 

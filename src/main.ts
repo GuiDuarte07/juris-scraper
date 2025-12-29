@@ -8,6 +8,7 @@ import { getQueueToken } from '@nestjs/bull';
 import { createBullBoard } from '@bull-board/api';
 import { Queue } from 'bull';
 import { Logger } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -15,8 +16,13 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   app.enableCors({
-    origin: true,
+    origin: ['http://localhost:3000'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
+
+  app.use(cookieParser());
 
   // Obtenha o ConfigService do contexto da aplicação para garantir a leitura correta
   const configService = app.get(ConfigService);
