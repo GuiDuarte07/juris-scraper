@@ -98,11 +98,23 @@ export abstract class BaseProcessService {
     // Verificar quais processos já existem no banco
     const processNumbers = uniqueProcessData.map((p) => p.processo);
 
-    const existingProcesses = await this.processRepository
-      .createQueryBuilder('process')
-      .select('process.processo')
-      .where('process.processo IN (:...processNumbers)', { processNumbers })
-      .getMany();
+    // Query existing processes in chunks to avoid sending too many parameters
+    // in a single SQL statement (which can break the Postgres wire protocol).
+    const existingProcesses: ProcessEntity[] = [];
+    const queryChunkSize = 1000;
+
+    for (let j = 0; j < processNumbers.length; j += queryChunkSize) {
+      const chunk = processNumbers.slice(j, j + queryChunkSize);
+      const found = await this.processRepository
+        .createQueryBuilder('process')
+        .select(['process.processo', 'process.id', 'process.batchId'])
+        .where('process.processo IN (:...chunk)', { chunk })
+        .getMany();
+
+      if (found && found.length > 0) {
+        existingProcesses.push(...found);
+      }
+    }
 
     const existingProcessNumbers = new Set(
       existingProcesses.map((p) => p.processo),
